@@ -1,0 +1,358 @@
+---
+title: "Neural Networks"
+author: "Devan Goto"
+date: "3/22/2017"
+output: html_document
+---
+
+## Part I - Introduction to Using Neural Nets
+
+In the attached data sets attention1.csv and attention2.csv, you will find data that describe features assocaited with webcam images of 100 students' faces as they particpate in an online discussion. The variables are:
+
+eyes - student has their eyes open (1 = yes, 0 = no)
+face.forward - student is facing the camera (1 = yes, 0 = no)
+chin.up - student's chin is raised above 45 degrees (1 = yes, 0 = no)
+attention - whether the student was paying attention when asked (1 = yes, 0 = no)
+
+We will use the webcam data to build a neural net to predict whether or not a student is attending.
+
+First install and load the neuralnet package
+```{r}
+
+install.packages("neuralnet")
+library(neuralnet)
+library(dplyr)
+
+```
+
+Now upload your data
+```{r}
+
+D1<-read.csv("attention1.csv", header = TRUE, sep = ",")
+  
+C1<-read.csv("attention2.csv", header = TRUE, sep = ",")
+
+gva<-read.csv("gva_release_2015_grouped_by_tract.csv", header = TRUE, sep = ",")
+
+```
+
+Now you can build a neural net that predicts attention based on webcam images. The command "neuralnet" sets up the model. It is composed of four basic arguments:
+
+- A formula that describes the inputs and outputs of the neural net (attention is our output)
+- The data frame that the model will use
+- How many hidden layers are in our neural net
+- A threshold that tells the model when to stop adjusting weights to find a better fit. If error does not change more than the threshold from one iteration to the next, the algorithm will stop (We will use 0.01, so if prediction error does not change by more than 1% from one iteration to the next the algorithm will halt)
+
+```{r}
+
+net <- neuralnet(attention ~ eyes + face.forward + chin.up, D1, hidden = 1, threshold = 0.01)
+
+plot(net)
+
+```
+
+You have now trained a neural network! The plot shows you the layers of your newtork as black nodes and edges with the calculated weights on each edge. The blue nodes and edges are called bias terms. The bias term anchors the activation function, the weights change the shape of the activation function while the bias term changes the overall position of the activation function - if you have used linear regressionthe bias term is like the intercept of the regression equation, it shifts the trend line up and down the y axis, while the other parameters change the angle of the line. The plot also reports the final error rate and the number of iterations ("steps") that it took to reach these weights.
+
+What happens if you increase the number of hidden layers in the neural net? 
+
+#It depends.  In general going from 0 to 1 layer or 1 to 2 layers will be good for accuracy.  However, this is not always the case.  As you increase hidden layers the efficacy of back propagation decreases.  Generally as you add more layers, past 2, accuracy decreases. 
+
+#Backpropagation: A way of computing the network’s weights by combining the chain rule (wisely computed in a modular way) along with gradient descent.
+
+#Gradient descent: A first-order iterative optimization algorithm used to find a local minimum of a function. Using gradient descent, one takes steps proportional to the negative of the gradient (or of the approximate gradient) of the function at the current point.
+
+Now use your neural net to predict the second data set. You will need to create a new data frame (D3) that only includes the input layers to use this command.
+
+```{r}
+
+C2 <- C1
+
+C2$attention<-NULL
+
+```
+
+Now you can create predictions using your neural net
+```{r}
+
+net.prediction <- compute(net, C2)
+
+#You can access the predictions from your model as "net.prediction$net.result". Predictions will be numeric estimates of 1 or 0, convert these into exact predictions of 1 and 0 and then determine the accuracy of your neural net on this new data.
+
+net.prediction$net.result
+
+#Make the above prediction into a dataframe. In this example it states that if npnr is >.01 the student will pay attention.   
+E1<-data.frame(net.prediction$net.result)
+
+E1$npnr<-ifelse(E1$net.prediction.net.result>.01,1,0)
+
+#Calculate the accuracy of this neural network.  Use a table with our predictions (E1$npnr) and our actual outcomes (C1$attention).  
+
+#Accuracy: What percent of the predictions were correct?
+#Precision: What percent of positive predictions were correct?
+#Recall: What percent of positive cases were caught?
+
+table1<-table(C1$attention,E1$npnr)
+     0  1
+  0 41  3
+  1  3 53
+
+Accuracy: (41+53)/100 = 94%
+Precision: 53/(53+3)= 94.64%
+Recall: 53/(53+3)=94.64%
+
+#The model has an accuracy of 94%.  This means 94% of the predictions were correct in predicting the actual outcome (attention).
+
+```
+
+## Part II - USA Shooting Data
+
+Last week The Guardian released shooting data that they had merged with census tract data from the USA. Read the article [here](https://www.theguardian.com/world/2017/mar/20/mapping-gun-murders-micro-level-new-data-2015?CMP=oth_b-aplnews_d-1) and then build a neural net to predict an output based on input variables from the data that is inlcuded in this repo (gva_release_2015_grouped_by_tract.csv). 
+
+You may choose whichever variables you are interested in, but you must be able to logically defend your model - can you reason about your choices? Your reasoning may be based on patterns you see in the data either through visualization or through statistics or they may be theoretical. Make sure you lay out a logical chain of reasoning.
+
+```{r}
+#Code book:
+
+tract_fips:Tract FIPS code (FIPS is Federal Information Proessing Standards)
+
+num_killed: Number of people killed
+
+num_incidents: Number of incidents
+
+sq.mile: Square miles in Census tract in 2014
+
+population: Total population in tract (2014)
+
+pop.black: Percent of black population in 2014
+
+over25.no.hs.degree:Percent of population over age 25 with no high school degree in 2014
+
+pop.in.poverty:Percent of population below the poverty line in 2014
+
+```
+
+```{r}
+
+#Goal: Identify which predictor variable best predits the criterion, using the measure of accuracy. 
+
+#Predictor variables = Black population, over25 with no hs degree, and below poverty line. Each of these variables have shown to be correlated to gun crime, which is why they are my predictor variables.  I would like to add that black populations are related to gun crimes  because they are related to the other two predictor variables (not because they are black).  Those who are black (and hispanic) tend to be less educated and have a higher poverty percentage than those who are white and asian. In other words, it is not one's ethnicity that predicates one's odds to commit gun crimes, it is one's circumstances (i.e. education and income).
+
+#Number of incidents will be used as our criterion. Number killed is a criterion that depends on another variable (number of incidents).  For example, let's say we have two areas with 100 people killed.  In one area there were 2 incidents, but in the other there were 80 incidents.  Yes the same amount of people were killed, but one area is much more prone to individual targeting; while the other area's deaths are subject to two mass murderers (this is more indicative of the person (some kind of mental issue) than the environment (education, income, etc.)). Although both areas had the same amount of people killed I believe that the area with 80 incidents is much more dangerous than the area with just 2.  Basically I believe the variable of number killed has other hidden variables involved. ##The best outcome variable would be "number of people commiting gun crimes," but since we do not have that we will be using number of incidents. 
+
+#Get a dataset with the variables we want
+
+gva2<-gva
+gva2[c(11:21)]<-NULL
+
+#Delete the invalid entry (tract_fips): 48201100000
+gva3<-gva2
+gva3<-gva3[!(gva3$tract_fips == 48201100000), ]
+
+#Make column names shorter
+colnames(gva3) [6]<- "sq.mile"
+colnames(gva3) [7]<- "population"
+colnames(gva3) [8]<- "pop.black"
+colnames(gva3) [9]<- "over25.no.hs.degree"
+colnames(gva3) [10]<- "pop.in.poverty"
+
+#Delete areas with a population of 0.
+gva4<-gva3
+gva4<-gva4[!(gva4$population == 0), ]
+
+#This had to be deleted manually
+gva4<-gva4[!(gva4$tract_fips == 4019410502), ]
+
+#Convert variables to numeric
+gva5$num_killed<-as.numeric(gva5$num_killed)
+gva5$num_incidents<-as.numeric(gva5$num_incidents)
+
+#Get rid of percentage signs so you can convert your factor variables into numeric variables
+
+gva5<-gva4
+
+gva5$over25.no.hs.degree <- as.numeric(gsub("%", "",gva5$over25.no.hs.degree))
+
+gva5$pop.black <- as.numeric(gsub("%", "",gva5$pop.black))
+
+gva5$pop.in.poverty <- as.numeric(gsub("%", "",gva5$pop.in.poverty))
+
+#Create new dataset. Consolidate data by city.  Combine predictor variables (poverty, black, & no hs degree (all combined by using mean)) & combine criterion (number of incidents (combined by using sum))
+
+H1<-gva5 %>% dplyr::group_by(city_or_county)%>%dplyr::summarise(sum(num_killed),sum(num_incidents),mean(pop.black),mean(over25.no.hs.degree),mean(pop.in.poverty))
+
+#Arbitrarily create binary outcomes (0,1) for predictor variables and criterion to use neural network algorithm
+
+#Binary Criterion. I have selected any incident count>1 will be considered a "dangerous area," thus getting a 1. Areas with a 0 will be considered safe. ##I would go higher, but I fear that if I go higher I will get a very low accuracy for my model.  The areas with >1 incident only account for 39.31% of the data (60.69 percentile).  If I go higher I will lose the variability in my criterion, which will lead to an unreliable model. 
+
+H2<-H1
+H2$`sum(num_incidents)`<-ifelse(H2$`sum(num_incidents)`>1,1,0)
+
+#Binary Predictor variables. I have selected 15% as my cutoff point for all three predictor variables.  If they receive a one that will indicate that the area has a relatively high percentage (>15%) of people that meet the predictor variable in a particular area.  
+#Black Population: >15% = 64.00 percentile
+#No HS Degree: >15% = 48.13 percentile
+#Poverty: >15% = 41.96 percentile
+
+H2$`mean(pop.black)`<-ifelse(H2$`mean(pop.black)`>15,1,0)
+
+H2$`mean(over25.no.hs.degree)`<-ifelse(H2$`mean(over25.no.hs.degree)`>15,1,0)
+
+H2$`mean(pop.in.poverty)`<-ifelse(H2$`mean(pop.in.poverty)`>15,1,0)
+
+#Rename columns, sometimes R doesn't recognize column names when they have symbols or parentheses in them
+
+G1<-H2
+colnames(G1) [3]<- "incidents"
+colnames(G1) [4]<- "pop.black"
+colnames(G1) [5]<- "over25.no.hs.degree"
+colnames(G1) [6]<- "pop.in.poverty"
+
+#Create a training and testing dataset from complete dataset (G1).  We will be using a 80:20 split (80 for our training set and 20 for our testing set).  If our training set is too small than our parameter estimates will have greater variance. This will create an unreliable model that doesn't accurately predict our outcome. 
+
+#Training Set: this data set is used to adjust the weights on the neural network. Used to fit parameters (i.e. weights)
+
+#Validation Set: This data set is used to minimize overfitting. Used to tune the parameters (i.e. architecture) Did not use validation set.
+
+#Testing Set: this data set is used only for testing the final solution in order to confirm the actual predictive power of the network. Used to assess the performance (i.e. predictive accuracy and generalization)
+
+#Gives us 80% of the data in G1
+G1.training<-dplyr::sample_frac(G1, .8)
+
+#Gives us the remaining 20% from G1. 
+G1.testing<-dplyr::setdiff(G1, G1.training)
+
+
+#Create Neural Network based on the criterion and 3 predictor variables, from our testing set.  This yielded an error of 248. What does this error indicate?
+
+net2<-neuralnet(incidents ~ pop.black + over25.no.hs.degree + pop.in.poverty, G1.training, hidden = 1, threshold = 0.01)
+
+#In the training dataset take out all variables that are not your predictor variables
+
+G1.testing2<-G1.testing
+G1.testing2$city_or_county<-NULL
+G1.testing2$`sum(num_killed)`<-NULL
+G1.testing2$incidents<-NULL
+
+#Test accuracy. Use testing dataset to give us the accuracy of our model.  
+
+net.prediction2 <- compute(net2, G1.testing2)
+
+net.prediction2$net.result
+
+#Make the above prediction into a dataframe.  I am unsure if I am allowed to chose the value at which we predict our criterion at (incidents), but I am choosing >mean(of npnr from my net prediction). If I chose the same value as the example ".01" then all of my predictions will be the same (defining every area as dangerous).
+
+Q1<-data.frame(net.prediction2$net.result)
+Q1$npnr<-ifelse(Q1$net.prediction2.net.result>mean(Q1$net.prediction2.net.result),1,0)
+
+table2<-table(G1.testing$incidents,Q1$npnr)
+
+     0   1
+  0 208 136
+  1  83 153
+
+Accuracy: (208+153)/580 = 62.24%
+Precision: 153/(153+136)= 52.94%
+Recall: 153/(153+83)= 64.83%
+
+#This tells us that our model was 62.24% accurate in predicting the outcome. In other words, the combination of our three predictor variables successfully predicted the criterion 62.24% of the time. 
+
+#Now test on the three predictor variables individually, and test accuracy.  The highest accuracy will indicate that, that predictor variable is the best at predicting the criterion. 
+
+#Create/train 3 new neural networks to use to predict criterion for each individual predictor variable
+
+##I cannot test each variable individually with the previous neural network because you need to have the same amount of neurones (predictors) in your network and your input. I want to test each predictor individually, this causes us to have one input neuron but 3 in the neural network. 
+
+net3<-neuralnet(incidents ~ pop.black, G1.training, hidden = 1, threshold = 0.01)
+
+plot(net3)
+
+net4<-neuralnet(incidents ~ over25.no.hs.degree, G1.training, hidden = 1, threshold = 0.01)
+
+plot(net4)
+
+net5<-neuralnet(incidents ~ pop.in.poverty, G1.training, hidden = 1, threshold = 0.01)
+
+plot(net5)
+
+#Create three new data frames to test variables indivually. These will only have the predictor variable we are looking to test. 
+
+G1.testing.pop.black<-select(G1.testing,4)
+
+G1.testing.over25.no.hs.degree<-select(G1.testing,5)
+
+G1.testing.pop.in.poverty<-select(G1.testing,6)
+
+#Test accuracy of each neural network
+
+net.prediction3 <- compute(net3, G1.testing.pop.black)
+
+net.prediction3$net.result
+
+net.prediction4 <- compute(net4, G1.testing.over25.no.hs.degree)
+
+net.prediction4$net.result
+
+net.prediction5 <- compute(net5, G1.testing.pop.in.poverty)
+
+net.prediction5$net.result
+
+#Make the above prediction into a dataframe. Once again using >mean(of npnr from my net prediction) as my value to predict the criterion.
+
+Q2<-data.frame(net.prediction3$net.result)
+Q2$npnr<-ifelse(Q2$net.prediction3.net.result>mean(Q2$net.prediction3.net.result),1,0)
+
+table3<-table(G1.testing$incidents,Q2$npnr)
+
+     0   1
+  0 247  97
+  1 117 119
+
+Accuracy: (247+119)/580 = 63.10%
+Precision: 119/(119+97)= 55.10%
+Recall: 119/(119+117)= 50.42%
+
+Q3<-data.frame(net.prediction4$net.result)
+Q3$npnr<-ifelse(Q3$net.prediction4.net.result>mean(Q3$net.prediction4.net.result),1,0)
+
+table4<-table(G1.testing$incidents,Q3$npnr)
+
+     0   1
+  0 175 169
+  1  94 142
+  
+Accuracy: (175+142)/580 = 54.66%
+Precision: 142/(142+169)= 45.66%
+Recall: 142/(142+94)= 60.17%
+
+Q4<-data.frame(net.prediction5$net.result)
+Q4$npnr<-ifelse(Q4$net.prediction5.net.result>mean(Q4$net.prediction5.net.result),1,0)
+
+table5<-table(G1.testing$incidents,Q4$npnr)
+
+     0   1
+  0 175 169
+  1  58 178
+
+Accuracy: (175+178)/580 = 60.86%
+Precision: 178/(178+169)= 51.30%
+Recall: 178/(178+58)= 75.42%
+
+#The accuracy for the three models are as follows.
+#Pop.black = 63.10%
+#over25.no.hs.degree = 54.66%
+#pop.in.poverty = 60.86%
+
+#This indicates that a high density black population is the most likely (predictor variable) to predict the our criterion (incidents).  I could end it here, but I want to discuss issues I faced while doing this assignment.
+
+#Issues.  
+#1. I had to create arbitrary binary classification for each predictor variable and criterion.  This caused bias in my findings. 
+#2. I manually chose to use >mean to decide the cut-off point for predicting the criterion, while testing accuracy.
+#3. I created three addition neural networks (one predictor each) after I created my original one (had 3 predictors). If I would have created one neural network based on one of my predictors would that have yielded similar results to my three seperate neural networks (with one predictor each), when it comes to accuracy? It would have been optimal to only create one and test the accuracy of each predictor variable afterwards, but I was unsure how that affected accuracy.  Would there have been an optimal choice as my predictor variable (education, ethnicity, income)?
+
+
+#What I wanted to do. I wanted to use a different type of neural network that predicts numerical outcomes (predicting the number of incidents based on the predictor variables), instead of a neural network that predicts binary outcomes (incident, 1 = dangerous area, 0 = not dangerous area).  Also, if I could have left my predictor variables as percentages or whole numbers I could have also avoided manually changing them into binary categories (0 1). I am not a fan in manually entering binary outcomes. This causes a bias.
+
+
+#Future implications. I am going to look into creating different types of neural networks.  This assignment was very interesting, and I want to expand my knowledge in this area. 
+
+```
+
